@@ -111,19 +111,16 @@ def wind_status(wind_kmh):
 
 def rain_status(rain_info):
     if rain_info["is_raining_now"]:
-        return "🌧️ RAINING NOW"
-    elif rain_info["rain_probability"] >= 70:
-        return f"⚠️ HIGH RAIN RISK ({rain_info['rain_probability']}%)"
+        return "Raining now"
     elif rain_info["rain_probability"] >= 40:
-        return f"🟡 POSSIBLE RAIN ({rain_info['rain_probability']}%)"
+        return f"Possible rain ({rain_info['rain_probability']}%)"
     else:
-        return f"✅ NO RAIN ({rain_info['rain_probability']}%)"
+        return "No rain"
 
 
 # ---------------- REPORT BUILDER ----------------
 def build_report():
-    now = datetime.now(IST).strftime("%d-%b-%Y %H:%M IST")
-    lines = [f"🚢 *Marine Safety Report*", f"🕐 {now}", ""]
+    lines = ["🚢📍 *Marine Multi-Location Safety Report*", ""]
 
     for name, (lat, lon) in LOCATIONS.items():
         try:
@@ -135,12 +132,12 @@ def build_report():
             continue
 
         lines.append(f"📍 *{name}*")
-        lines.append(f"   Wind: {weather['wind_kmh']} km/h — {wind_status(weather['wind_kmh'])}")
-        lines.append(f"   Temp: {weather['temp']}°C | Humidity: {weather['humidity']}%")
-        lines.append(f"   Condition: {weather['condition']}")
-        lines.append(f"   Rain: {rain_status(rain)}")
-        if rain["next_3h_precip_mm"] > 0:
-            lines.append(f"   Next 3h rainfall: {rain['next_3h_precip_mm']} mm")
+        lines.append(f"🌬️ Wind: {weather['wind_kmh']} km/h")
+        lines.append(f"🌡️ Temp: {weather['temp']} °C")
+        lines.append(f"💧 Humidity: {weather['humidity']}%")
+        lines.append(f"🌤️ Condition: {weather['condition']}")
+        lines.append(f"🌧️ Rain: {rain_status(rain)}")
+        lines.append(f"{wind_status(weather['wind_kmh'])}")
         lines.append("")
 
     return "\n".join(lines)
