@@ -100,22 +100,54 @@ def fetch_rain_data(lat, lon):
 
 
 # ---------------- CLASSIFICATION ----------------
-def wind_status(wind_kmh):
+# Severity scale used everywhere: 0 = SAFE, 1 = MODERATE, 2 = DANGER
+STATUS_LABELS = {0: "✅ SAFE", 1: "🟡 MODERATE", 2: "🔴 DANGER"}
+
+# Rain intensity thresholds (mm in the preceding hour — standard met. classification)
+LIGHT_RAIN_MM = 2.5    # below this = light rain
+HEAVY_RAIN_MM = 7.6    # at/above this = heavy rain
+
+
+def wind_severity(wind_kmh):
     if wind_kmh < 20:
-        return "✅ SAFE"
+        return 0
     elif wind_kmh <= 35:
-        return "🟡 MODERATE"
+        return 1
     else:
-        return "🔴 DANGER"
+        return 2
+
+
+def wind_status(wind_kmh):
+    return STATUS_LABELS[wind_severity(wind_kmh)]
+
+
+def rain_severity_and_label(rain_info):
+    """Returns (severity, label_text) based on current rain intensity / forecast probability."""
+    if rain_info["is_raining_now"]:
+        intensity = max(rain_info["current_precip_mm"], 0)
+        if intensity >= HEAVY_RAIN_MM:
+            return 2, f"Heavy rain ({intensity} mm/hr)"
+        elif intensity >= LIGHT_RAIN_MM:
+            return 2, f"Moderate rain ({intensity} mm/hr)"
+        else:
+            return 1, f"Light rain ({intensity} mm/hr)"
+    elif rain_info["rain_probability"] >= 40:
+        return 1, f"Possible rain ({rain_info['rain_probability']}%)"
+    else:
+        return 0, "No rain"
 
 
 def rain_status(rain_info):
-    if rain_info["is_raining_now"]:
-        return "Raining now"
-    elif rain_info["rain_probability"] >= 40:
-        return f"Possible rain ({rain_info['rain_probability']}%)"
-    else:
-        return "No rain"
+    _, label = rain_severity_and_label(rain_info)
+    return label
+
+
+def combined_status(wind_kmh, rain_info):
+    """Overall location status = worst case of wind and rain severity."""
+    w_sev = wind_severity(wind_kmh)
+    r_sev, _ = rain_severity_and_label(rain_info)
+    overall = max(w_sev, r_sev)
+    return STATUS_LABELS[overall]
 
 
 # ---------------- REPORT BUILDER ----------------
@@ -137,7 +169,7 @@ def build_report():
         lines.append(f"💧 Humidity: {weather['humidity']}%")
         lines.append(f"🌤️ Condition: {weather['condition']}")
         lines.append(f"🌧️ Rain: {rain_status(rain)}")
-        lines.append(f"{wind_status(weather['wind_kmh'])}")
+        lines.append(f"{combined_status(weather['wind_kmh'], rain)}")
         lines.append("")
 
     return "\n".join(lines)
