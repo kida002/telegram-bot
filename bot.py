@@ -58,11 +58,10 @@ def fetch_wind_temp_humidity(lat, lon):
 
 
 def fetch_rain_data(lat, lon):
-    """Accurate rain forecast from Open-Meteo (replaces unreliable OpenWeather rain field)."""
+    """Accurate rain forecast from Open-Meteo using hourly precipitation (same as Rain Indicator Bot)."""
     params = {
         "latitude": lat,
         "longitude": lon,
-        "current": "precipitation,rain,weather_code",
         "hourly": "precipitation_probability,precipitation",
         "timezone": "Asia/Kolkata",
         "forecast_days": 1,
@@ -71,31 +70,27 @@ def fetch_rain_data(lat, lon):
     r.raise_for_status()
     data = r.json()
 
-    current = data.get("current", {})
-    current_precip_mm = current.get("precipitation", 0) or 0
-    current_rain_mm = current.get("rain", 0) or 0
-
-    # Find current hour's index in hourly array to get precipitation_probability
+    # Match current hour in hourly forecast array
     now_iso = datetime.now(IST).strftime("%Y-%m-%dT%H:00")
     hourly_times = data.get("hourly", {}).get("time", [])
     hourly_prob = data.get("hourly", {}).get("precipitation_probability", [])
     hourly_precip = data.get("hourly", {}).get("precipitation", [])
 
     prob = 0
-    next_hours_precip = 0
+    hourly_precip_mm = 0
+
     if now_iso in hourly_times:
         idx = hourly_times.index(now_iso)
         prob = hourly_prob[idx] if idx < len(hourly_prob) else 0
-        # sum precipitation forecast for next 3 hours
-        next_hours_precip = sum(hourly_precip[idx:idx + 3]) if hourly_precip else 0
+        hourly_precip_mm = hourly_precip[idx] if idx < len(hourly_precip) else 0
 
-    is_raining_now = current_rain_mm > 0 or current_precip_mm > 0
+    hourly_precip_mm = round(hourly_precip_mm or 0, 2)
+    is_raining = hourly_precip_mm > 0 or prob >= 40
 
     return {
-        "is_raining_now": is_raining_now,
-        "current_precip_mm": round(current_precip_mm, 2),
+        "is_raining_now": is_raining,
+        "current_precip_mm": hourly_precip_mm,
         "rain_probability": prob,
-        "next_3h_precip_mm": round(next_hours_precip, 2),
     }
 
 
