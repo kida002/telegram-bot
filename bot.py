@@ -152,19 +152,27 @@ def build_report():
     for name, (lat, lon) in LOCATIONS.items():
         try:
             weather = fetch_wind_temp_humidity(lat, lon)
-            rain = fetch_rain_data(lat, lon)
         except Exception as e:
-            logger.error(f"Error fetching data for {name}: {e}")
+            logger.error(f"OpenWeather failed for {name}: {type(e).__name__}: {e}")
             lines.append(f"📍 *{name}*\n⚠️ Data unavailable\n")
             continue
+
+        try:
+            rain = fetch_rain_data(lat, lon)
+            rain_line = f"🌧️ Rain: {rain_status(rain)}"
+            status_line = combined_status(weather['wind_kmh'], rain)
+        except Exception as e:
+            logger.error(f"Open-Meteo failed for {name}: {type(e).__name__}: {e}")
+            rain_line = "🌧️ Rain: Data unavailable"
+            status_line = wind_status(weather['wind_kmh'])
 
         lines.append(f"📍 *{name}*")
         lines.append(f"🌬️ Wind: {weather['wind_kmh']} km/h")
         lines.append(f"🌡️ Temp: {weather['temp']} °C")
         lines.append(f"💧 Humidity: {weather['humidity']}%")
         lines.append(f"🌤️ Condition: {weather['condition']}")
-        lines.append(f"🌧️ Rain: {rain_status(rain)}")
-        lines.append(f"{combined_status(weather['wind_kmh'], rain)}")
+        lines.append(rain_line)
+        lines.append(status_line)
         lines.append("")
 
     return "\n".join(lines)
