@@ -2,6 +2,7 @@ import os
 import logging
 import requests
 import pytz
+import time
 from datetime import datetime, time as dtime
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
@@ -57,7 +58,7 @@ def fetch_wind_temp_humidity(lat, lon):
     }
 
 
-def fetch_rain_data(lat, lon):
+def fetch_rain_data(lat, lon, retries=3, delay=2):
     """Accurate rain forecast from Open-Meteo using hourly precipitation (same as Rain Indicator Bot)."""
     params = {
         "latitude": lat,
@@ -66,32 +67,41 @@ def fetch_rain_data(lat, lon):
         "timezone": "Asia/Kolkata",
         "forecast_days": 1,
     }
-    r = requests.get(OPENMETEO_URL, params=params, timeout=10)
-    r.raise_for_status()
-    data = r.json()
 
-    # Match current hour in hourly forecast array
-    now_iso = datetime.now(IST).strftime("%Y-%m-%dT%H:00")
-    hourly_times = data.get("hourly", {}).get("time", [])
-    hourly_prob = data.get("hourly", {}).get("precipitation_probability", [])
-    hourly_precip = data.get("hourly", {}).get("precipitation", [])
+    for attempt in range(retries):
+        try:
+            r = requests.get(OPENMETEO_URL, params=params, timeout=15)
+            r.raise_for_status()
+            data = r.json()
 
-    prob = 0
-    hourly_precip_mm = 0
+            now_iso = datetime.now(IST).strftime("%Y-%m-%dT%H:00")
+            hourly_times = data.get("hourly", {}).get("time", [])
+            hourly_prob = data.get("hourly", {}).get("precipitation_probability", [])
+            hourly_precip = data.get("hourly", {}).get("precipitation", [])
 
-    if now_iso in hourly_times:
-        idx = hourly_times.index(now_iso)
-        prob = hourly_prob[idx] if idx < len(hourly_prob) else 0
-        hourly_precip_mm = hourly_precip[idx] if idx < len(hourly_precip) else 0
+            prob = 0
+            hourly_precip_mm = 0
 
-    hourly_precip_mm = round(hourly_precip_mm or 0, 2)
-    is_raining = hourly_precip_mm > 0 or prob >= 40
+            if now_iso in hourly_times:
+                idx = hourly_times.index(now_iso)
+                prob = hourly_prob[idx] if idx < len(hourly_prob) else 0
+                hourly_precip_mm = hourly_precip[idx] if idx < len(hourly_precip) else 0
 
-    return {
-        "is_raining_now": is_raining,
-        "current_precip_mm": hourly_precip_mm,
-        "rain_probability": prob,
-    }
+            hourly_precip_mm = round(hourly_precip_mm or 0, 2)
+            is_raining = hourly_precip_mm > 0 or prob >= 40
+
+            return {
+                "is_raining_now": is_raining,
+                "current_precip_mm": hourly_precip_mm,
+                "rain_probability": prob,
+            }
+
+        except Exception as e:
+            logger.warning(f"Open-Meteo attempt {attempt + 1}/{retries} failed for ({lat},{lon}): {e}")
+            if attempt < retries - 1:
+                time.sleep(delay)
+
+    raise Exception(f"Open-Meteo failed after {retries} attempts")
 
 
 # ---------------- CLASSIFICATION ----------------
@@ -174,6 +184,7 @@ def build_report():
         lines.append(rain_line)
         lines.append(status_line)
         lines.append("")
+        time.sleep(1)  # avoid Open-Meteo rate limiting between locations
 
     return "\n".join(lines)
 
