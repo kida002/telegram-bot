@@ -88,7 +88,7 @@ def fetch_rain_data(lat, lon, retries=3, delay=2):
                 hourly_precip_mm = hourly_precip[idx] if idx < len(hourly_precip) else 0
 
             hourly_precip_mm = round(hourly_precip_mm or 0, 2)
-            is_raining = hourly_precip_mm > 0 or prob >= 40
+            is_raining = hourly_precip_mm > 0  # only true if actual mm > 0, not just probability
 
             return {
                 "is_raining_now": is_raining,
