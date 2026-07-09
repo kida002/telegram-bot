@@ -128,16 +128,20 @@ def wind_status(wind_kmh):
 
 def rain_severity_and_label(rain_info):
     """Returns (severity, label_text) based on current rain intensity / forecast probability."""
-    if rain_info["is_raining_now"]:
-        intensity = max(rain_info["current_precip_mm"], 0)
-        if intensity >= HEAVY_RAIN_MM:
-            return 2, f"Heavy rain ({intensity} mm/hr)"
-        elif intensity >= LIGHT_RAIN_MM:
-            return 2, f"Moderate rain ({intensity} mm/hr)"
-        else:
-            return 1, f"Light rain ({intensity} mm/hr)"
-    elif rain_info["rain_probability"] >= 40:
-        return 1, f"Possible rain ({rain_info['rain_probability']}%)"
+    mm = rain_info["current_precip_mm"]
+    prob = rain_info["rain_probability"]
+
+    if mm >= HEAVY_RAIN_MM:
+        return 2, f"Heavy rain ({mm} mm/hr)"
+    elif mm >= LIGHT_RAIN_MM:
+        return 2, f"Moderate rain ({mm} mm/hr)"
+    elif mm > 0:
+        return 1, f"Light rain ({mm} mm/hr)"
+    elif prob >= 70:
+        # High probability but mm=0 — Open-Meteo data gap, treat as light rain
+        return 1, f"Light rain expected ({prob}%)"
+    elif prob >= 40:
+        return 1, f"Possible rain ({prob}%)"
     else:
         return 0, "No rain"
 
